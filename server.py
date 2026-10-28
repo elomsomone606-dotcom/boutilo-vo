@@ -28,10 +28,26 @@ else:
     DB = DATA / 'boutiquepilot.sqlite3'
     IntegrityError = sqlite3.IntegrityError
 
+def log_failure(stage, error):
+    # Never log exception text, request data, database URLs or credentials.
+    state = getattr(error, 'sqlstate', None)
+    if not isinstance(state, str) or not re.fullmatch(r'[0-9A-Z]{5}', state):
+        state = 'none'
+    print(f'Boutilo diagnostic: stage={stage} type={type(error).__name__} sqlstate={state}', flush=True)
+
 class PostgresConnection:
     def __init__(self):
-        self.conn = psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=10, sslmode="verify-full")
-        self.conn.execute('SET search_path TO boutique_private')
+        try:
+            self.conn = psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=10, sslmode="verify-full")
+        except Exception as error:
+            log_failure('db_connect', error)
+            raise
+        try:
+            self.conn.execute('SET search_path TO boutique_private')
+        except Exception as error:
+            self.conn.close()
+            log_failure('db_schema', error)
+            raise
     def __enter__(self):
         return self
     def __exit__(self, typ, value, traceback):
@@ -330,7 +346,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(403, {'error': str(e)})
         except (ValueError, TypeError, KeyError, OverflowError) as e:
             self.send(400, {'error': str(e) if isinstance(e, ValueError) else 'Données invalides.'})
-        except Exception:
+        except Exception as error:
+            log_failure('request', error)
             self.send(500, {'error': 'Erreur serveur. Réessayez dans un instant.'})
 
     def do_PUT(self):
@@ -357,7 +374,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(403, {'error': str(e)})
         except (ValueError, TypeError, KeyError, OverflowError) as e:
             self.send(400, {'error': str(e) if isinstance(e, ValueError) else 'Données invalides.'})
-        except Exception:
+        except Exception as error:
+            log_failure('request', error)
             self.send(500, {'error': 'Erreur serveur. Réessayez dans un instant.'})
 
 if __name__ == '__main__':
