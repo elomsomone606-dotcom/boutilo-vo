@@ -1,0 +1,10 @@
+private_data/
+node_modules/
+__pycache__/
+*.pyc
+.env
+public/
+.vercel/
+.venv/
+
+.env.*
