@@ -2,6 +2,9 @@
   command = "python3 build_netlify.py"
   publish = "public"
 
+[build.environment]
+  BACKEND_URL = "https://boutilo-vo.onrender.com"
+
 [[headers]]
   for = "/*"
   [headers.values]
